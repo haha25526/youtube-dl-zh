@@ -16,6 +16,48 @@ import json
 import urllib.request
 import urllib.parse
 import subprocess
+import shutil
+
+
+def check_dependency(name, install_cmd=None):
+    """检查依赖是否安装，未安装则尝试安装"""
+    if shutil.which(name):
+        return True
+
+    print(f"未找到 {name}，尝试安装...")
+
+    if install_cmd:
+        result = subprocess.run(install_cmd, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"{name} 安装成功")
+            return shutil.which(name) is not None
+        else:
+            print(f"{name} 安装失败：{result.stderr}")
+            return False
+    return False
+
+
+def check_dependencies():
+    """检查所有依赖"""
+    deps = {
+        'yt-dlp': 'pip install --user yt-dlp',
+        'ffmpeg': None,  # 需要系统安装
+        'whisper': 'pip install --user openai-whisper',
+    }
+
+    missing = []
+    for name, install_cmd in deps.items():
+        if not check_dependency(name, install_cmd):
+            missing.append(name)
+
+    if missing:
+        print(f"\n缺少依赖：{', '.join(missing)}")
+        if 'ffmpeg' in missing:
+            print("请手动安装 ffmpeg:")
+            print("  Ubuntu/Debian: sudo apt install ffmpeg")
+            print("  macOS: brew install ffmpeg")
+        return False
+    return True
 
 
 def run_command(cmd, cwd=None):
@@ -83,7 +125,8 @@ def download_video(url, output_dir):
     # 使用 yt-dlp 下载视频
     cmd = f'yt-dlp -o "%(title)s.%(ext)s" -f "best[ext=mp4]/best" "{url}"'
     print(f"正在下载视频...")
-    run_command(cmd, cwd=output_dir)
+    if not run_command(cmd, cwd=output_dir):
+        return None
 
     # 查找下载的视频文件
     video_files = [f for f in os.listdir(output_dir) if f.endswith('.mp4')]
@@ -102,7 +145,9 @@ def extract_audio(video_file, output_dir):
     cmd = f'ffmpeg -i "{video_file}" -vn -acodec libmp3lame -qscale:a 2 "{audio_file}" -y'
     print(f"正在提取音频...")
     run_command(cmd)
-    return audio_file
+    if os.path.exists(audio_file):
+        return audio_file
+    return None
 
 
 def generate_subtitle(audio_file, output_dir):
@@ -123,7 +168,9 @@ def embed_subtitle(video_file, subtitle_file, output_file):
     cmd = f'ffmpeg -i "{video_file}" -vf "subtitles={subtitle_file}:force_style=\'FontName=SimHei,FontSize=14,PrimaryColour=&HFFFFFF,BackColour=&H000000,BorderStyle=4\'" -c:a copy "{output_file}" -y'
     print(f"正在嵌入字幕...")
     run_command(cmd)
-    return output_file
+    if os.path.exists(output_file):
+        return output_file
+    return None
 
 
 def cleanup(output_dir):
@@ -139,6 +186,10 @@ def cleanup(output_dir):
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
+        sys.exit(1)
+
+    # 检查依赖
+    if not check_dependencies():
         sys.exit(1)
 
     url = sys.argv[1]

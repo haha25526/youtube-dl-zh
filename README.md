@@ -8,6 +8,16 @@
 - 使用 Whisper 进行语音识别生成字幕
 - 使用 Google 翻译将字幕翻译成中文
 - 将中文字幕嵌入视频
+- 自动检查和安装依赖
+
+## 快速开始
+
+```bash
+git clone https://github.com/haha25526/youtube-dl-zh.git
+cd youtube-dl-zh
+pip install -r requirements.txt
+python3 download.py "https://www.youtube.com/watch?v=Brj5QnphFxg" ~/Videos
+```
 
 ## 依赖
 
